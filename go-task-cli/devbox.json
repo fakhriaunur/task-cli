@@ -1,6 +1,6 @@
 {
   "packages": [
-    "go@1.23.1",
+    "go@1.23.1"
   ],
   "shell": {
     "init_hook": [
@@ -8,10 +8,10 @@
       "export \"GOROOT=$(go env GOROOT)\""
     ],
     "scripts": {
-      "install":   "go get ./...",
-      "run":       "go run .",
-      "test":      "go test ./...",
-      "tidy":      "go mod tidy"
+      "install": "go get ./...",
+      "run": "go run .",
+      "test": "go test ./...",
+      "tidy": "go mod tidy"
     }
   }
 }
