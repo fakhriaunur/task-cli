@@ -1,0 +1,20 @@
+.
+├── cmd
+│   └── main.go                # Entry point for your application.
+├── internal
+│   └── database
+│       ├── database.go        # Handles interactions with the JSON "database".
+│       └── task.go            # Task-related structures and operations.
+├── handlers
+│   ├── command.go             # Contains CLI command handling logic.
+│   └── handlers.go            # Other handler logic, possibly HTTP or CLI actions.
+├── data
+│   ├── task-cli.json          # JSON file used as the "database".
+│   └── task.example.json      # Example task data.
+├── docs
+│   └── json_handling.md       # Documentation for handling JSON in your project.
+├── devbox.json
+├── devbox.lock
+├── go.mod
+├── state.go                   # Global state management, related if applicable.
+├── README.md                  # Project overview and structure explanation.

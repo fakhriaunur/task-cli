@@ -1,0 +1,170 @@
+package database
+
+import (
+	"errors"
+	"fmt"
+	"time"
+)
+
+const (
+	StatusTodo       = "todo"
+	StatusInProgress = "in-progress"
+	StatusDone       = "done"
+	StatusUnknown    = "unknown status"
+)
+
+var (
+	TimeNowLocal = time.Now().Local()
+	TimeZero     = time.Time{}
+)
+
+type Task struct {
+	ID          int
+	Description string
+	Status      string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// TODO: Refactor the commands / query integreated with DB
+func (db *DB) Add(desc string) (Task, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return Task{}, err
+	}
+
+	id := len(dbStructure.Tasks) + 1
+	task := Task{
+		ID:          id,
+		Description: desc,
+		Status:      StatusTodo,
+		CreatedAt:   TimeNowLocal,
+		UpdatedAt:   TimeZero,
+	}
+	dbStructure.Tasks[id] = task
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return Task{}, err
+	}
+
+	return task, nil
+}
+
+func (db *DB) Update(id int, desc string) error {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+
+	task, ok := dbStructure.Tasks[id]
+	if !ok {
+		return ErrNotExist
+	}
+
+	task.Description = desc
+	task.UpdatedAt = TimeNowLocal
+	dbStructure.Tasks[id] = task
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *DB) Delete(id int) error {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+
+	_, ok := dbStructure.Tasks[id]
+	if !ok {
+		return ErrNotExist
+	}
+
+	delete(dbStructure.Tasks, id)
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *DB) MarkInProgress(id int) error {
+	fmt.Println("before hello")
+	return db.mark(id, StatusInProgress)
+}
+
+func (db *DB) MarkDone(id int) error {
+	fmt.Println("before hello")
+	return db.mark(id, StatusDone)
+}
+
+func (db *DB) mark(id int, status string) error {
+	fmt.Println("hello")
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+	fmt.Println("loaded db")
+
+	task, ok := dbStructure.Tasks[id]
+	if !ok {
+		return ErrNotExist
+	}
+	fmt.Println("task loaded")
+
+	task.Status = status
+	dbStructure.Tasks[id] = task
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return err
+	}
+	fmt.Println("written to db")
+
+	return nil
+}
+
+func (db *DB) ListAll() ([]Task, error) {
+	return db.list("")
+}
+func (db *DB) ListByStatus(status string) ([]Task, error) {
+	return db.list(status)
+}
+func (db *DB) list(status string) ([]Task, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return nil, err
+	}
+
+	var tasks []Task
+	switch status {
+	case "":
+		fmt.Printf("len begin: %d\n", len(dbStructure.Tasks))
+		for _, task := range dbStructure.Tasks {
+			tasks = append(tasks, task)
+		}
+		return tasks, nil
+
+	case StatusDone, StatusInProgress, StatusTodo:
+		fmt.Printf("len begin: %d\n", len(dbStructure.Tasks))
+		for _, task := range dbStructure.Tasks {
+			fmt.Printf("task.id: %d\ttask.status: %s\tstatus: %s\n", task.ID, task.Status, status)
+			if task.Status == status {
+				fmt.Printf("task.status: %s\tstatus: %s\n", task.Status, status)
+				tasks = append(tasks, task)
+				fmt.Printf("len end: %d\n", len(tasks))
+			}
+		}
+	default:
+		return nil, errors.New(StatusUnknown)
+	}
+
+	return tasks, nil
+}
