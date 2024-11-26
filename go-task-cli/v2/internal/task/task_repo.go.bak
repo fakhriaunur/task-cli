@@ -1,17 +1,22 @@
 package task
 
 import (
-	"log"
 	"os"
+	"sync"
 )
 
 type TaskRepo struct {
-	dao taskDAOPort
+	cfg   *TaskRepoConfig
+	Tasks map[int]task
 }
 
-func NewTaskRepo(dao taskDAOPort) (taskRepoPort, error) {
+func NewTaskRepo(path string) (taskRepoPort, error) {
 	repo := &TaskRepo{
-		dao: dao,
+		cfg: &TaskRepoConfig{
+			path: path,
+			mu:   &sync.RWMutex{},
+		},
+		Tasks: make(map[int]task),
 	}
 
 	return repo, nil
@@ -19,13 +24,13 @@ func NewTaskRepo(dao taskDAOPort) (taskRepoPort, error) {
 
 // add implements TaskRepoPort.
 func (r *TaskRepo) add(desc string) (task, error) {
-	ts, err := r.dao.loadTaskStructure()
-	if err != nil {
-		log.Println("here load")
-		return task{}, err
-	}
+	// currTaskRepo, err := r.cfg.load()
+	// if err != nil {
+	// 	log.Println("here load")
+	// 	return task{}, err
+	// }
 
-	newID := len(ts.Tasks)
+	newID := len(r.Tasks)
 	newTask := task{
 		ID:          newID,
 		Status:      statusTodo,
@@ -34,9 +39,9 @@ func (r *TaskRepo) add(desc string) (task, error) {
 		UpdatedAt:   timeZero,
 	}
 
-	ts.Tasks[newID] = newTask
+	r.Tasks[newID] = newTask
 
-	if err := r.dao.saveTaskStructure(ts); err != nil {
+	if err := r.cfg.write(r.Tasks); err != nil {
 		return task{}, err
 	}
 
@@ -45,19 +50,19 @@ func (r *TaskRepo) add(desc string) (task, error) {
 
 // delete implements TaskRepoPort.
 func (r *TaskRepo) delete(id int) error {
-	ts, err := r.dao.loadTaskStructure()
+	currTaskRepo, err := r.cfg.load()
 	if err != nil {
 		return err
 	}
 
-	_, ok := ts.Tasks[id]
+	_, ok := currTaskRepo.Tasks[id]
 	if !ok {
 		return os.ErrNotExist
 	}
 
-	delete(ts.Tasks, id)
+	delete(currTaskRepo.Tasks, id)
 
-	if err := r.dao.saveTaskStructure(ts); err != nil {
+	if err := r.cfg.write(currTaskRepo); err != nil {
 		return err
 	}
 
@@ -66,13 +71,13 @@ func (r *TaskRepo) delete(id int) error {
 
 // listAll implements TaskRepoPort.
 func (r *TaskRepo) listAll() ([]task, error) {
-	ts, err := r.dao.loadTaskStructure()
+	currTaskRepo, err := r.cfg.load()
 	if err != nil {
 		return nil, err
 	}
 
 	var tasks []task
-	for _, task := range ts.Tasks {
+	for _, task := range currTaskRepo.Tasks {
 		tasks = append(tasks, task)
 	}
 
@@ -81,13 +86,13 @@ func (r *TaskRepo) listAll() ([]task, error) {
 
 // listByStatus implements TaskRepoPort.
 func (r *TaskRepo) listByStatus(status string) ([]task, error) {
-	ts, err := r.dao.loadTaskStructure()
+	currTaskRepo, err := r.cfg.load()
 	if err != nil {
 		return nil, err
 	}
 
 	var tasks []task
-	for _, task := range ts.Tasks {
+	for _, task := range currTaskRepo.Tasks {
 		if task.Status == status {
 			tasks = append(tasks, task)
 		}
@@ -98,20 +103,20 @@ func (r *TaskRepo) listByStatus(status string) ([]task, error) {
 
 // markDone implements TaskRepoPort.
 func (r *TaskRepo) markDone(id int) error {
-	ts, err := r.dao.loadTaskStructure()
+	currTaskRepo, err := r.cfg.load()
 	if err != nil {
 		return err
 	}
 
-	task, ok := ts.Tasks[id]
+	task, ok := currTaskRepo.Tasks[id]
 	if !ok {
 		return os.ErrNotExist
 	}
 
 	task.Status = statusDone
-	ts.Tasks[id] = task
+	currTaskRepo.Tasks[id] = task
 
-	if err := r.dao.saveTaskStructure(ts); err != nil {
+	if err := r.cfg.write(currTaskRepo); err != nil {
 		return err
 	}
 
@@ -120,20 +125,20 @@ func (r *TaskRepo) markDone(id int) error {
 
 // markInProgress implements TaskRepoPort.
 func (r *TaskRepo) markInProgress(id int) error {
-	ts, err := r.dao.loadTaskStructure()
+	currTaskRepo, err := r.cfg.load()
 	if err != nil {
 		return err
 	}
 
-	task, ok := ts.Tasks[id]
+	task, ok := currTaskRepo.Tasks[id]
 	if !ok {
 		return os.ErrNotExist
 	}
 
 	task.Status = statusInProgress
-	ts.Tasks[id] = task
+	currTaskRepo.Tasks[id] = task
 
-	if err := r.dao.saveTaskStructure(ts); err != nil {
+	if err := r.cfg.write(currTaskRepo); err != nil {
 		return err
 	}
 
@@ -142,20 +147,20 @@ func (r *TaskRepo) markInProgress(id int) error {
 
 // update implements TaskRepoPort.
 func (r *TaskRepo) update(id int, desc string) error {
-	ts, err := r.dao.loadTaskStructure()
+	currTaskRepo, err := r.cfg.load()
 	if err != nil {
 		return err
 	}
 
-	task, ok := ts.Tasks[id]
+	task, ok := currTaskRepo.Tasks[id]
 	if !ok {
 		return os.ErrNotExist
 	}
 
 	task.Description = desc
-	ts.Tasks[id] = task
+	currTaskRepo.Tasks[id] = task
 
-	if err := r.dao.saveTaskStructure(ts); err != nil {
+	if err := r.cfg.write(currTaskRepo); err != nil {
 		return err
 	}
 

@@ -1,0 +1,82 @@
+package task
+
+import (
+	"encoding/json"
+	"log"
+	"os"
+	"sync"
+)
+
+type TaskRepoConfig struct {
+	path string
+	mu   *sync.RWMutex
+}
+
+func NewTaskRepoConfig(path string) (TaskRepoConfigPort[TaskRepo], error) {
+	cfg := &TaskRepoConfig{
+		path: path,
+		mu:   &sync.RWMutex{},
+	}
+
+	return cfg, nil
+}
+
+// load implements TaskRepoConfigPort.
+func (cfg *TaskRepoConfig) load() (TaskRepo, error) {
+	cfg.mu.RLock()
+	defer cfg.mu.RUnlock()
+
+	file, err := os.OpenFile(
+		cfg.path,
+		os.O_RDONLY|os.O_CREATE,
+		0644,
+	)
+	log.Println("opened files")
+	if err != nil {
+		log.Println("here loload")
+		return TaskRepo{}, err
+	}
+	defer file.Close()
+
+	var repo TaskRepo
+	if err := json.NewDecoder(file).Decode(&repo.Tasks); err != nil &&
+		err.Error() != "EOF" {
+		log.Printf("Decoding: %v\n", err)
+		return TaskRepo{}, err
+	}
+
+	return repo, nil
+}
+
+// reset implements TaskRepoConfigPort.
+func (cfg *TaskRepoConfig) reset() error {
+	if err := os.Remove(cfg.path); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// write implements TaskRepoConfigPort.
+func (cfg *TaskRepoConfig) write(repo TaskRepo) error {
+	cfg.mu.Lock()
+	defer cfg.mu.Unlock()
+
+	file, err := os.OpenFile(
+		cfg.path,
+		os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
+		0644,
+	)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	if err := json.NewEncoder(file).Encode(repo.Tasks); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+var _ TaskRepoConfigPort[TaskRepo] = (*TaskRepoConfig)(nil)

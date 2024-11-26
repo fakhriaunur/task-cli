@@ -6,9 +6,18 @@ import (
 	"github.com/fakhriaunur/task-cli/go-task-cli/v2/internal/task"
 )
 
+// TODO: create commands builder or middleware / decorator
+
 type command struct {
 	name string
 	args []string
+}
+
+func NewCommand(n string, a []string) command {
+	return command{
+		name: n,
+		args: a,
+	}
 }
 
 type commands struct {
@@ -28,7 +37,7 @@ func (c *commands) register(
 	c.registeredCmds[name] = f
 }
 
-func (c *commands) run(
+func (c *commands) Run(
 	ts task.TaskServicePort,
 	cmd command,
 ) error {
